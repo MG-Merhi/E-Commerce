@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Service Home</title>
+    <link rel="stylesheet" href="home__page_style.css">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.css"/>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick-theme.min.css"/>
+</head>
+<body>
+    <header>
+        <h1>Home_page</h1>
+        <div class="header-right">
+            <div class="header-search-container">
+                <div class="header-search">
+                    <input type="text" id="search-term" placeholder="Search products...">
+                    <button class="search-button" onclick="searchProducts()">Search</button>
+                </div>
+                <div class="header-category-filter">
+                    <label for="category-filter"></label>
+                    <select id="category-filter" onchange="filterProducts(this.value)">
+                        <option value="">All Categories</option>
+                        <?php foreach ($pageData['categories'] as $category): ?>
+                            <option value="<?php echo htmlspecialchars($category['category_id']); ?>">
+                                <?php echo htmlspecialchars(ucfirst($category['category_name'])); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="home_page.php">Home</a></li>
+                    <li><a href="contact.php">Contact</a></li>
+                    <li id="login-link-li"><a href="#" id="show-login-form">Login</a></li>
+                    <li><a href="http://localhost/user_registration/api/register.php">Sign Up</a></li>
+                    <li id="logout-link-li" style="display: none;"><a href="#" id="logout-link">Logout</a></li>
+                </ul>
+            </nav>
+            <div id="user-info">
+                <?php echo $pageData['loggedIn'] ? '<span class="welcome">Welcome, ' . $pageData['email'] . '!</span>' : '<span></span>'; ?>
+            </div>
+        </div>
+    </header>
+
+    <nav class="home-category-menu">
+        <ul>
+            <li><a href="product_list.php">All Products</a></li>
+            <?php foreach ($pageData['categories'] as $category): ?>
+                <li>
+                    <a href="product_list.php?category=<?php echo htmlspecialchars($category['category_id']); ?>">
+                        <?php echo htmlspecialchars(ucfirst($category['category_name'])); ?>
+                    </a>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <main class="product-navigation">
+            <div id="signup-section">
+                <h2>Sign Up</h2>
+                <div id="signup-error-message" class="error" style="display:none;"></div>
+                <form id="signupForm">
+                    <div class="form-group">
+                        <label for="signup-email">Email:</label>
+                        <input type="email" id="signup-email" name="email" required>
+                        <div id="signup-email-error" class="error-message" style="display:none;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-password">Password:</label>
+                        <input type="password" id="signup-password" name="password" required>
+                        <div id="signup-password-error" class="error-message" style="display:none;"></div>
+                    </div>
+                    <button type="submit">Sign Up</button>
+                </form>
+                <p class="login-link">Already have an account? <a href="#" id="show-login-form-from-signup">Login</a></p>
+            </div>
+
+            <div class="slider-container" style="max-width: 100%; margin: 20px auto; text-align: center;">
+                <?php foreach ($pageData['sliderImages'] as $slide): ?>
+                    <div class="slide" style="display: block;">
+                        <a href="product_list.php" style="display: inline-block;">
+                            <img src="<?php echo htmlspecialchars($slide['image']); ?>"
+                                 alt="<?php echo htmlspecialchars($slide['alt']); ?>"
+                                 style="width: 100px; height: 100px; border-radius: 70%; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);">
+                        </a>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="featured-products-container">
+                <h2>Featured Products</h2>
+                <div class="featured-products-grid" id="featured-products-grid">
+                    </div>
+            </div>
+        </main>
+    </div>
+
+    <?php include 'footer.php'; ?>
+
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.js"></script>
+    <script>
+       document.addEventListener("DOMContentLoaded", function () {
+            const showLoginFormLink = document.getElementById("show-login-form");
+            const signupLinkLi = document.querySelector('nav ul li:nth-child(4)'); // Adjusted index
+            const loginLinkLi = document.getElementById("login-link-li");
+            const logoutLinkLi = document.getElementById("logout-link-li");
+            const logoutLink = document.getElementById("logout-link");
+            const signupSection = document.getElementById("signup-section");
+            const showLoginFormFromSignupLink = document.getElementById("show-login-form-from-signup");
+            const featuredProductsGrid = document.getElementById("featured-products-grid");
+
+            const isLoggedIn = <?php echo json_encode($pageData['loggedIn']); ?>;
+            const authToken = '<?php echo $pageData['authToken']; ?>';
+            const logoutApiUrl = 'http://localhost/user_registration/api/logout.php'; // REPLACE WITH YOUR ACTUAL URL IF DIFFERENT!
+            const loginPageUrl = 'http://localhost/user_registration/api/login.php'; // REPLACE WITH YOUR ACTUAL URL IF DIFFERENT!
+            const homePageUrl = 'home_page.php';
+
+            function callLogoutMicroservice() {
+                if (!authToken) {
+                    console.error("Authentication token not found for logout.");
+                    window.location.href = loginPageUrl;
+                    return;
+                }
+
+                fetch(logoutApiUrl, {
+                    method: 'POST', // ENSURE THIS IS 'POST'
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ auth_key: authToken })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        console.error('Logout API failed:', response.status, response.statusText);
+                        return response.json().then(errorData => {
+                            console.error('Logout API error details:', errorData);
+                            window.location.href = loginPageUrl + '?logout_failed=1';
+                            throw new Error('Logout API request failed');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Logout API successful:', data);
+                    // Now call the local logout script to destroy the PHP session and redirect
+                    fetch("logout.php", { method: "POST" }) // ENSURE THIS IS 'POST' as well
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.href = homePageUrl;
+                        } else {
+                            console.error('Local logout.php call failed:', response.status);
+                            window.location.href = homePageUrl + '?local_logout_failed=1';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error during local logout:', error);
+                        window.location.href = homePageUrl + '?local_logout_error=1';
+                    });
+                })
+                .catch(error => {
+                    console.error('Error during API logout:', error);
+                    // The redirection to login with logout_failed=1 is already handled in the first .then() error block
+                });
+            }
+
+            if (isLoggedIn) {
+                if (loginLinkLi) loginLinkLi.style.display = "none";
+                if (logoutLinkLi) logoutLinkLi.style.display = "block";
+                if (signupLinkLi) signupLinkLi.style.display = "none";
+                if (signupSection) signupSection.style.display = "none";
+
+                logoutLink.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    callLogoutMicroservice();
+                });
+            } else {
+                if (loginLinkLi) loginLinkLi.style.display = "block";
+                if (logoutLinkLi) logoutLinkLi.style.display = "none";
+                if (signupLinkLi) signupLinkLi.style.display = "block";
+                if (signupSection) signupSection.style.display = "none";
+
+                if (showLoginFormLink) {
+                    showLoginFormLink.addEventListener("click", function (e) {
+                        e.preventDefault();
+                        window.location.href = "http://localhost/user_registration/api/login.php";
+                    });
+                }
+            }
+
+            // Initialize Slick Carousel
+            $('.slider-container').slick({
+                autoplay: true,
+                autoplaySpeed: 3000, // Change slide every 3 seconds
+                dots: true,
+                arrows: true,
+                infinite: true,
+                speed: 500,
+                slidesToShow: 1,
+                slidesToScroll: 1,
+                centerMode: true, // Enable center mode
+                centerPadding: '60px' // Adjust padding as needed
+            });
+        });
+    </script>
+</body>
+</html>
